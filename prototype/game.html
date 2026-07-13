@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>五子棋对战 - 游戏中</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 
+                         'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 375px;
+            height: 812px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .info-bar {
+            background: white;
+            padding: 20px 20px;
+            border-bottom: 1px solid #F0F0F0;
+        }
+
+        .player-info {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .status-info {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-info.your-turn {
+            color: #1890FF;
+        }
+
+        .status-info.waiting {
+            color: #8C8C8C;
+        }
+
+        .status-info.disconnect {
+            color: #FA8C16;
+        }
+
+        .board-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #gameBoard {
+            background: #D2B48C;
+            border: 2px solid #8B4513;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+        }
+
+        .bottom-actions {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .resign-button {
+            width: 120px;
+            height: 44px;
+            background: white;
+            color: #FF4D4F;
+            font-size: 16px;
+            border: 1px solid #FF4D4F;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .resign-button:hover {
+            background: #FFF1F0;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 16px;
+            width: 280px;
+            padding: 30px;
+            text-align: center;
+            animation: modalIn 0.3s ease-out;
+        }
+
+        @keyframes modalIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .modal-title.win {
+            color: #52C41A;
+        }
+
+        .modal-title.lose {
+            color: #FF4D4F;
+        }
+
+        .modal-subtitle {
+            font-size: 14px;
+            color: #8C8C8C;
+            margin-bottom: 24px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-button {
+            flex: 1;
+            height: 40px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            border: none;
+            transition: all 0.3s;
+        }
+
+        .modal-button.primary {
+            background: #1890FF;
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            background: #0050B3;
+        }
+
+        .modal-button.secondary {
+            background: white;
+            color: #595959;
+            border: 1px solid #D9D9D9;
+        }
+
+        .modal-button.secondary:hover {
+            border-color: #1890FF;
+            color: #1890FF;
+        }
+
+        .scenario-switch {
+            position: absolute;
+            top: 90px;
+            right: 10px;
+            background: rgba(24, 144, 255, 0.1);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #1890FF;
+            cursor: pointer;
+            border: 1px solid #1890FF;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="scenario-switch" onclick="toggleStatus()">切换状态</div>
+
+        <div class="info-bar">
+            <div class="player-info">你是: <span id="playerColor">⚫ 黑方</span></div>
+            <div class="status-info your-turn" id="statusText">轮到你了!</div>
+        </div>
+
+        <div class="board-container">
+            <canvas id="gameBoard" width="330" height="330"></canvas>
+        </div>
+
+        <div class="bottom-actions">
+            <button class="resign-button" onclick="showModal()">认输</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal-card">
+            <div class="modal-icon" id="modalIcon">🎉</div>
+            <div class="modal-title win" id="modalTitle">你赢了!</div>
+            <div class="modal-subtitle" id="modalSubtitle">五子连珠!</div>
+            <div class="modal-buttons">
+                <button class="modal-button primary" onclick="goHome()">再来一局</button>
+                <button class="modal-button secondary" onclick="goHome()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameBoard');
+        const ctx = canvas.getContext('2d');
+        const GRID_SIZE = 15;
+        const CELL_SIZE = 20;
+        const PADDING = 15;
+        const BOARD_SIZE = CELL_SIZE * (GRID_SIZE - 1);
+
+        let currentStatus = 1;
+        const board = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+
+        board[7][7] = 1;
+        board[7][8] = 2;
+        board[8][7] = 1;
+        board[8][8] = 2;
+        board[6][7] = 1;
+        board[7][9] = 2;
+
+        function drawBoard() {
+            ctx.fillStyle = '#D2B48C';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+                ctx.beginPath();
+                ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+                ctx.lineTo(PADDING + BOARD_SIZE, PADDING + i * CELL_SIZE);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(PADDING + i * CELL_SIZE, PADDING);
+                ctx.lineTo(PADDING + i * CELL_SIZE, PADDING + BOARD_SIZE);
+                ctx.stroke();
+            }
+
+            const starPoints = [[3,3], [3,11], [7,7], [11,3], [11,11]];
+            starPoints.forEach(([x, y]) => {
+                ctx.beginPath();
+                ctx.arc(PADDING + x * CELL_SIZE, PADDING + y * CELL_SIZE, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = '#8B4513';
+                ctx.fill();
+            });
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    if (board[i][j] === 1) {
+                        drawStone(i, j, 'black');
+                    } else if (board[i][j] === 2) {
+                        drawStone(i, j, 'white');
+                    }
+                }
+            }
+        }
+
+        function drawStone(x, y, color) {
+            const centerX = PADDING + x * CELL_SIZE;
+            const centerY = PADDING + y * CELL_SIZE;
+            const radius = CELL_SIZE * 0.4;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            
+            if (color === 'black') {
+                ctx.fillStyle = '#000';
+                ctx.fill();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+            } else {
+                ctx.fillStyle = '#FFF';
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            ctx.shadowColor = 'transparent';
+        }
+
+        function toggleStatus() {
+            currentStatus = (currentStatus % 3) + 1;
+            const statusText = document.getElementById('statusText');
+            
+            statusText.className = 'status-info';
+            
+            if (currentStatus === 1) {
+                statusText.textContent = '轮到你了!';
+                statusText.classList.add('your-turn');
+            } else if (currentStatus === 2) {
+                statusText.textContent = '等待对方...';
+                statusText.classList.add('waiting');
+            } else {
+                statusText.textContent = '对手断线中...剩余25秒';
+                statusText.classList.add('disconnect');
+            }
+        }
+
+        function showModal() {
+            document.getElementById('gameOverModal').classList.add('show');
+        }
+
+        function goHome() {
+            window.location.href = 'home.html';
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const gridX = Math.round((x - PADDING) / CELL_SIZE);
+            const gridY = Math.round((y - PADDING) / CELL_SIZE);
+            
+            if (gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE) {
+                if (board[gridX][gridY] === 0) {
+                    board[gridX][gridY] = 1;
+                    drawBoard();
+                    
+                    setTimeout(() => {
+                        const emptySpots = [];
+                        for (let i = 0; i < GRID_SIZE; i++) {
+                            for (let j = 0; j < GRID_SIZE; j++) {
+                                if (board[i][j] === 0) emptySpots.push([i, j]);
+                            }
+                        }
+                        if (emptySpots.length > 0) {
+                            const [rx, ry] = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+                            board[rx][ry] = 2;
+                            drawBoard();
+                        }
+                    }, 500);
+                }
+            }
+        });
+
+        drawBoard();
+
+        setTimeout(() => {
+            showModal();
+        }, 5000);
+    </script>
+</body>
+</html>
